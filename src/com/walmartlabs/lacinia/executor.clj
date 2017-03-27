@@ -266,17 +266,20 @@
   [context]
   (let [schema (get context constants/schema-key)
         selections (get-in context [constants/parsed-query-key :selections])]
-    (reduce (fn [root-result query-node]
-              (if (:disabled? query-node)
-                root-result
-                (let [result (resolve-and-select context query-node nil)
-                      resolve-errors (resolve/resolve-errors result)
-                      selected-data (->> result
-                                         resolve/resolved-value
-                                         (propogate-nulls false)
-                                         null-to-nil)]
-                  (cond-> root-result
-                    true (assoc-in [:data (:alias query-node)] selected-data)
-                    (seq resolve-errors) (assoc :errors resolve-errors)))))
-            {:data nil}
-            selections)))
+    (persistent!
+     (reduce (fn [root-result query-node]
+               (if (:disabled? query-node)
+                 root-result
+                 (let [result (resolve-and-select context query-node nil)
+                       resolve-errors (resolve/resolve-errors result)
+                       selected-data (->> result
+                                          resolve/resolved-value
+                                          (propogate-nulls false)
+                                          null-to-nil)]
+                   (cond-> root-result
+                     true (assoc! :data (assoc (get root-result :data)
+                                               (:alias query-node)
+                                               selected-data))
+                     (seq resolve-errors) (assoc! :errors resolve-errors)))))
+             (transient {:data nil})
+             selections))))

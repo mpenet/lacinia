@@ -167,8 +167,9 @@
       (->> directives
            (reduce (fn [acc [[_ k] v]]
                      ;; TODO: Spec indicates that directives must be unique by name
-                     (assoc acc (keyword k) (node-reducer {} v)))
-                   {})
+                     (assoc! acc (keyword k) (node-reducer {} v)))
+                   (transient {}))
+           persistent!
            (assoc acc :directives)))
 
     :selectionSet
@@ -774,10 +775,11 @@
               (normalize-selections schema
                                     m
                                     fragment-type
-                                    [path-elem])))
-        defs (map f fragment-definitions)]
-    (zipmap (map :fragment-name defs)
-            (map #(finalize-fragment-def schema %) defs))))
+                                    [path-elem])))]
+    (into {} (comp (map f)
+                   (map (juxt :fragment-name
+                              (partial finalize-fragment-def schema))))
+          fragment-definitions)))
 
 (defmulti ^:private selection
   "A recursive function that parses the ANTLR selection structure into the
